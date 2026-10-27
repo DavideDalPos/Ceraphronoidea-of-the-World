@@ -32,7 +32,38 @@ const COUPLET_CROP_MIN = 1205431
 const COUPLET_CROP_MAX = 1205470
 const HABITUS_MIN = 1205360
 const HABITUS_MAX = 1205383
-const PAPER_URL = 'https://doi.org/10.18476/2025.246600'
+
+/** Origin-paper URLs when the key payload has no DOI (Pinpoint used one Moser DOI for every key). */
+const PAPER_URL_FALLBACK = {
+  34905: 'https://doi.org/10.18476/2025.246600',
+  35110: 'https://doi.org/10.7717/peerj.2682',
+  35151: 'https://doi.org/10.1093/isd/ixy015',
+  35180: 'https://doi.org/10.11646/zootaxa.4792.1.1'
+}
+
+const paperUrlByKeyId = Object.create(null)
+
+function doiUrlFromText(text) {
+  const match = String(text || '').match(
+    /(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)?(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i
+  )
+  if (!match) return null
+  return `https://doi.org/${match[1].replace(/[.,;)\]]+$/, '')}`
+}
+
+function paperUrlFromPayload(data) {
+  const oc = data?.metadata?.origin_citation
+  if (!oc) return null
+  if (typeof oc === 'string') return doiUrlFromText(oc)
+  const source = oc.source && typeof oc.source === 'object' ? oc.source : oc
+  if (source.doi) return doiUrlFromText(String(source.doi))
+  const fromCached = doiUrlFromText(
+    source.object_tag || source.cached || source.url || ''
+  )
+  if (fromCached) return fromCached
+  if (/^https?:\/\//i.test(source.url || '')) return source.url
+  return null
+}
 
 function imageIdFromPath(path) {
   const match = String(path || '').match(/images\/(\d+)/)
@@ -149,6 +180,11 @@ function patchFetch() {
         spliceRedirects(await response.clone().json()),
         url
       )
+      const keyMatch = url.match(/\/leads\/key\/(\d+)/i)
+      if (keyMatch) {
+        const found = paperUrlFromPayload(data)
+        if (found) paperUrlByKeyId[keyMatch[1]] = found
+      }
       return new Response(JSON.stringify(data), {
         status: response.status,
         statusText: response.statusText,
@@ -238,15 +274,26 @@ function keyIdFromLocation() {
   return match ? match[1] : null
 }
 
+function paperUrlForKey(keyId) {
+  if (!keyId) return null
+  return paperUrlByKeyId[keyId] || PAPER_URL_FALLBACK[keyId] || null
+}
+
 function fixCitationLink(app) {
   const keyId = keyIdFromLocation()
+  const paperUrl = paperUrlForKey(keyId)
   app.querySelectorAll('.pinpoint-node-target a').forEach((link) => {
     const href = link.getAttribute('href') || ''
     const otuId = (href.match(/otus\/(\d+)/) || [])[1]
     if (!keyId || otuId !== keyId) return
     if (link.dataset.cowCitation === '1') return
     link.dataset.cowCitation = '1'
-    link.setAttribute('href', PAPER_URL)
+    if (!paperUrl) {
+      link.removeAttribute('href')
+      link.setAttribute('role', 'text')
+      return
+    }
+    link.setAttribute('href', paperUrl)
     link.setAttribute('target', '_blank')
     link.setAttribute('rel', 'noopener')
     link.addEventListener(
@@ -254,7 +301,7 @@ function fixCitationLink(app) {
       (event) => {
         event.preventDefault()
         event.stopImmediatePropagation()
-        window.open(PAPER_URL, '_blank', 'noopener')
+        window.open(paperUrl, '_blank', 'noopener')
       },
       true
     )
