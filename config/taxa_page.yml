@@ -1,18 +1,29 @@
-# Taxon page panel layout
+# Taxon page tabs and panels.
+# The big photo with the taxon name (taxon-hero/) sits above the tabs on every tab.
 
 taxa_page:
   overview:
+    label: Overview
     panels:
-      - - - 'panel:type-specimen'
-          - 'panel:gallery'
-          - 'panel:type'
-          - 'panel:nomenclature'
-          - 'panel:nomenclature-references'
-
-        - - 'panel:map'
-          - 'panel:descendants'
+      - - - 'panel:names'
           - 'panel:content'
           - 'panel:keys'
-          - 'panel:sounds'
 
+        - - 'panel:map'
+          - 'panel:children'
+          - 'panel:hosts-summary'
+          - 'panel:type-specimen'
+          - 'panel:type'
+          - 'panel:sounds'
+          - 'panel:cite'
+
+  hosts:
+    label: Hosts & associations
+    panels:
+      - - - 'panel:hosts'
       - - - 'panel:biological-association-graphs'
+
+  images:
+    label: Images
+    panels:
+      - - - 'panel:images'

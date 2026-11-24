@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="isLoading || errorMessage || graphs.length || leftover.length"
+    v-if="graphs.length"
     class="cow-bagraph-panel"
     :class="{ 'cow-bagraph-panel--open': panelOpen }"
   >
@@ -9,9 +9,7 @@
       @click="togglePanel"
     >
       <h2 class="cow-bagraph-panel__heading">
-        Biological associations{{
-          associationCount == null ? '' : ` (${associationCount})`
-        }}
+        Host chains from the literature ({{ graphs.length }})
       </h2>
       <div
         class="cow-bagraph-panel__json"
@@ -38,7 +36,7 @@
     <p v-if="isLoading" class="cow-bagraph__status">Loading associations…</p>
     <p v-else-if="errorMessage" class="cow-bagraph__status">{{ errorMessage }}</p>
     <p v-else class="cow-bagraph__help">
-      Host chains from the cited paper. Linked names open that taxon page.
+      Each chain is one host relationship as described in the cited paper, read from left to right. Linked names open that taxon page.
     </p>
 
     <div
@@ -113,7 +111,8 @@
       </div>
     </div>
 
-    <div v-if="leftover.length" class="cow-bagraph-fallback">
+    <!-- single records are listed in the "Hosts & associations" panel -->
+    <div v-if="false && leftover.length" class="cow-bagraph-fallback">
       <table class="cow-bagraph-fallback__table">
         <thead>
           <tr>
@@ -161,7 +160,7 @@ const props = defineProps({
 const graphs = ref([])
 const leftover = ref([])
 const opened = ref({})
-const panelOpen = ref(false)
+const panelOpen = ref(true)
 const isLoading = ref(false)
 const errorMessage = ref('')
 const associationCount = ref(null)
@@ -319,12 +318,14 @@ async function loadGraphs(otuId) {
       })
     )
 
-    graphs.value = detailed
+    const sorted = detailed
       .filter((graph) => graph.layout.nodes.length)
       .sort(
         (a, b) =>
           compareByCitationYear(a.citation, b.citation) || a.id - b.id
       )
+    graphs.value = sorted
+    opened.value = Object.fromEntries(sorted.slice(0, 3).map((g) => [g.id, true]))
     leftover.value = (associations || [])
       .filter((row) => row?.id && !usedIds.has(row.id))
       .map((row) => ({

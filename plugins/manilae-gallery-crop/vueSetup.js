@@ -67,6 +67,12 @@ function isTallPortrait(width, height) {
   return Math.abs(ratio - PORTRAIT_RATIO) / PORTRAIT_RATIO <= PORTRAIT_RATIO_SLACK
 }
 
+// The gallery now runs full width at the top of the page: let the main image
+// use most of the screen height (between 420 and 760 px).
+function stageMaxHeight() {
+  return Math.round(Math.min(760, Math.max(420, window.innerHeight * 0.72)))
+}
+
 function layoutFill(img) {
   const wrap = img.parentElement
   const stage = wrap?.parentElement
@@ -86,9 +92,9 @@ function layoutFill(img) {
       parseFloat(stageStyle.paddingLeft) -
       parseFloat(stageStyle.paddingRight)
   )
-  const maxH = 400
+  const maxH = stageMaxHeight()
   const scaleFit = Math.min(1, maxW / visW, maxH / visH)
-  const zoom = natH >= 400 ? 1.2 : 1
+  const zoom = natH >= maxH ? 1.2 : 1
   const scale = Math.min(1, scaleFit * zoom)
   const boxW = Math.round(visW * scaleFit)
   const boxH = Math.round(visH * scaleFit)
@@ -101,7 +107,7 @@ function layoutFill(img) {
   wrap.style.width = `${boxW}px`
   wrap.style.height = `${boxH}px`
   wrap.style.maxWidth = '100%'
-  wrap.style.maxHeight = '400px'
+  wrap.style.maxHeight = `${maxH}px`
   wrap.style.background = 'transparent'
   img.style.clipPath = 'none'
   img.style.width = `${natW * scale}px`

@@ -1,0 +1,14 @@
+{
+  "title": "Ceraphronoidea of the World: website",
+  "description": "Source code of the Ceraphronoidea of the World website (TaxonPages), which serves names, images, host associations, keys and specimen data for the superfamily Ceraphronoidea (Hymenoptera) from TaxonWorks.",
+  "upload_type": "software",
+  "license": "MIT",
+  "creators": [
+    { "name": "Mikó, István", "affiliation": "University of New Hampshire" },
+    { "name": "Tilton, Shane", "affiliation": "University of New Hampshire" }
+  ],
+  "keywords": ["Ceraphronoidea", "Ceraphronidae", "Megaspilidae", "Stigmaphronidae", "Hymenoptera", "TaxonWorks", "TaxonPages", "biodiversity informatics"],
+  "related_identifiers": [
+    { "identifier": "https://shanetiltongc.github.io/Ceraphronoidea-of-the-World/", "relation": "isSupplementTo", "scheme": "url" }
+  ]
+}

@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this website or its data, please cite it as below."
+title: "Ceraphronoidea of the World"
+type: software
+authors:
+  - family-names: Mikó
+    given-names: István
+    affiliation: University of New Hampshire
+  - family-names: Tilton
+    given-names: Shane
+    affiliation: University of New Hampshire
+url: "https://shanetiltongc.github.io/Ceraphronoidea-of-the-World/"
+repository-code: "https://github.com/Shanetiltongc/Ceraphronoidea-of-the-World"
+keywords:
+  - Ceraphronoidea
+  - Hymenoptera
+  - TaxonWorks
+  - TaxonPages

@@ -7,14 +7,27 @@ header_links:
   - label: Home
     link: /
 
-  - label: Search DwC
-    link: /resources/tw/filter/dwc_otus
-
-  - label: Bibliography
-    link: /resources/tw/filter/bibliography
+  - label: Explore
+    submenu:
+      - label: Atlas
+        link: /atlas
+      - label: Hosts & interactions
+        link: /interactions
+      - label: Type specimens
+        link: /types
+      - label: Fossils
+        link: /fossils
+      - label: Specimen data (DwC)
+        link: /resources/tw/filter/dwc_otus
 
   - label: Keys
     link: /keys
+
+  - label: Literature
+    link: /literature
+
+  - label: Cite
+    link: /cite
 
   - label: About
     link: /about
