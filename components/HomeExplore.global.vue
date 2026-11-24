@@ -190,7 +190,7 @@ const TOOLS = [
   { title: 'Literature', text: 'Two centuries of papers, by year, author and journal.', go: 'Literature', to: '/literature', icon: ICON.book },
   { title: 'Atlas', text: 'Species in each biogeographic realm, and which live nowhere else.', go: 'Open the atlas', to: '/atlas', icon: ICON.pin },
   { title: 'Type specimens', text: 'Every holotype, lectotype and paratype, by museum.', go: 'Type catalogue', to: '/types', icon: ICON.key },
-  { title: 'Specimen data', text: 'Search and download specimen records as Darwin Core.', go: 'Search records', to: '/resources/tw/filter/dwc_otus', icon: ICON.pin }
+  { title: 'Specimens & records', text: 'Museum specimens and literature records, filtered and downloadable.', go: 'Browse records', to: '/specimens', icon: ICON.pin }
 ]
 
 const counts = reactive({})

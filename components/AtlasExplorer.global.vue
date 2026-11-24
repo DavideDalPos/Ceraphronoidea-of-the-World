@@ -14,67 +14,23 @@
 
       <!-- the world map of realms -->
       <div class="cow-at__world">
-        <svg
-          viewBox="0 12 360 140"
-          class="cow-at__svg"
+        <div
+          ref="mapEl"
+          class="cow-at__leaflet"
           role="img"
           aria-label="World map of the biogeographic realms, shaded by number of species"
+        />
+        <div
+          class="cow-at__legend"
+          aria-hidden="true"
         >
-          <g class="cow-at__grat">
-            <line
-              v-for="lon in [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150]"
-              :key="`x${lon}`"
-              :x1="lon + 180"
-              :x2="lon + 180"
-              y1="12"
-              y2="152"
-            />
-            <line
-              v-for="lat in [60, 30, 0, -30]"
-              :key="`y${lat}`"
-              x1="0"
-              x2="360"
-              :y1="90 - lat"
-              :y2="90 - lat"
-              :class="{ 'is-eq': lat === 0 }"
-            />
-          </g>
-          <path
-            v-for="r in realms.filter((x) => shapes[x.name])"
-            :key="r.name"
-            :d="shapes[r.name]"
-            :class="['cow-at__realm-shape', { 'is-on': realm === r.name, 'is-hover': hoverRealm === r.name }]"
-            :style="{ '--k': `${Math.round(20 + (r.species / maxSpecies) * 75)}%` }"
-            fill-rule="evenodd"
-            tabindex="0"
-            role="button"
-            :aria-label="`${r.name}: ${r.species} species`"
-            @mouseenter="hoverRealm = r.name"
-            @mouseleave="hoverRealm = ''"
-            @click="pick(r.name)"
-            @keydown.enter="pick(r.name)"
+          <span>Species per realm</span>
+          <span
+            class="cow-at__ramp"
+            :style="{ background: RAMP }"
           />
-          <g
-            v-for="r in realms.filter((x) => shapes[x.name] && LABEL[x.name])"
-            :key="`t${r.name}`"
-            class="cow-at__maplabel"
-            :transform="`translate(${LABEL[r.name][0] + 180},${90 - LABEL[r.name][1]})`"
-          >
-            <text
-              class="cow-at__mapnum"
-              text-anchor="middle"
-            >
-              {{ r.species }}
-            </text>
-            <text
-              class="cow-at__mapname"
-              text-anchor="middle"
-              y="5.5"
-            >
-              {{ r.name.toUpperCase() }}
-            </text>
-          </g>
-        </svg>
+          <span class="cow-at__ends"><b>{{ minSpecies }}</b><b>{{ maxSpecies }}</b></span>
+        </div>
         <p
           v-if="shapesLoading"
           class="cow-at__maploading"
@@ -96,8 +52,8 @@
           v-for="r in realms"
           :key="r.name"
           type="button"
-          :class="['cow-at__tile', `cow-at__tile--${r.key}`, { 'is-on': realm === r.name }]"
-          :style="{ '--k': `${Math.round(18 + (r.species / maxSpecies) * 72)}%` }"
+          :class="['cow-at__tile', `cow-at__tile--${r.key}`, { 'is-on': realm === r.name, 'is-deep': (r.species - minSpecies) / Math.max(1, maxSpecies - minSpecies) > 0.45 }]"
+          :style="{ background: colorAt(tOf(r)), color: isDark(tOf(r)) ? '#fff' : '#15191d' }"
           :aria-pressed="realm === r.name"
           @click="pick(r.name)"
         >
@@ -195,9 +151,12 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { loadDwc, csv, download, italic } from '../lib/dwc.js'
-import { realmShapes } from '../lib/realms.js'
+import { colorAt, RAMP, isDark } from '../lib/realms.js'
+import { resolveAssetUrl } from '@/utils/url'
+
+const { base_url } = __APP_ENV__
 
 // where to write each realm's number on the map (longitude, latitude)
 const LABEL = {
@@ -219,7 +178,9 @@ const genus = ref('All')
 const q = ref('')
 const onlyHere = ref(false)
 const listEl = ref(null)
-const shapes = ref({})
+const mapEl = ref(null)
+let map = null
+let layers = {}
 const shapesLoading = ref(false)
 const hoverRealm = ref('')
 const hoverInfo = computed(() => realms.value.find((r) => r.name === hoverRealm.value))
@@ -234,15 +195,78 @@ onMounted(async () => {
   }
   realm.value = realms.value.slice().sort((a, b) => b.species - a.species)[0]?.name || ''
 
-  // one species recorded from a single realm per realm: its map is the realm
-  const pickOtu = {}
-  bySpecies.value.forEach((s) => {
-    if (s.realms.length === 1 && s.otu && !pickOtu[s.realms[0]]) pickOtu[s.realms[0]] = s.otu
-  })
+  // one world map of countries, each coloured by its realm (public/data/world-realms.json)
   shapesLoading.value = true
-  shapes.value = await realmShapes(pickOtu).catch(() => ({}))
+  try {
+    const res = await fetch(resolveAssetUrl('/data/world-realms.json', base_url))
+    await drawMap(await res.json())
+  } catch {
+    /* map unavailable: the realm buttons below still work */
+  }
   shapesLoading.value = false
 })
+
+const tOf = (r) => (r.species - minSpecies.value) / Math.max(1, maxSpecies.value - minSpecies.value)
+const styleOf = (r) => ({
+  color: '#ffffff',
+  weight: 0.6,
+  fillColor: colorAt(tOf(r)),
+  fillOpacity: !realm.value || realm.value === r.name ? 1 : 0.55
+})
+
+async function drawMap(world) {
+  if (!mapEl.value) return
+  const L = (await import('leaflet')).default
+  map = L.map(mapEl.value, {
+    center: [22, 15],
+    zoom: 2,
+    minZoom: 1,
+    maxZoom: 6,
+    zoomSnap: 0.25,
+    scrollWheelZoom: false,
+    worldCopyJump: false,
+    maxBounds: [[-75, -200], [88, 220]],
+    attributionControl: true
+  })
+  map.attributionControl.addAttribution('Countries: Natural Earth · realms assigned by country (approximate)')
+  // countries outside any realm with records stay neutral
+  const known = new Set(realms.value.map((r) => r.name))
+  L.geoJSON(
+    { type: 'FeatureCollection', features: world.features.filter((f) => !known.has(f.properties.realm)) },
+    { style: { color: '#ffffff', weight: 0.6, fillColor: '#d9d6cc', fillOpacity: 1 }, interactive: false }
+  ).addTo(map)
+  realms.value.forEach((r) => {
+    const feats = world.features.filter((f) => f.properties.realm === r.name)
+    if (!feats.length) return
+    const layer = L.geoJSON({ type: 'FeatureCollection', features: feats }, { style: () => styleOf(r) })
+    layer.on('mouseover', () => {
+      hoverRealm.value = r.name
+      layer.setStyle({ fillOpacity: 1, color: '#15191d', weight: 1 })
+    })
+    layer.on('mouseout', () => {
+      hoverRealm.value = ''
+      layer.setStyle(styleOf(r))
+    })
+    layer.on('click', () => pick(r.name))
+    layer.addTo(map)
+    layers[r.name] = layer
+    if (LABEL[r.name]) {
+      L.marker([LABEL[r.name][1], LABEL[r.name][0]], {
+        interactive: false,
+        icon: L.divIcon({
+          className: `cow-at__pin${isDark(tOf(r)) ? ' is-deep' : ''}`,
+          html: `<b>${r.species}</b><span>${r.name}</span>`,
+          iconSize: [110, 40],
+          iconAnchor: [55, 20]
+        })
+      }).addTo(map)
+    }
+  })
+  map.fitBounds([[-52, -160], [78, 185]])
+}
+
+watch(realm, () => realms.value.forEach((r) => layers[r.name]?.setStyle(styleOf(r))))
+onBeforeUnmount(() => map?.remove())
 
 const cites = computed(() => rows.value.filter((r) => r.basisOfRecord === 'MaterialCitation' && r.locality))
 // species → the realms it is recorded from
@@ -275,6 +299,7 @@ const realms = computed(() => {
   })
 })
 const maxSpecies = computed(() => Math.max(1, ...realms.value.map((r) => r.species)))
+const minSpecies = computed(() => Math.min(...realms.value.map((r) => r.species)))
 const current = computed(() => realms.value.find((r) => r.name === realm.value))
 
 const shownSpecies = computed(() => {

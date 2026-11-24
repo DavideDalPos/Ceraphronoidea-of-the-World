@@ -38,7 +38,7 @@
         <RouterLink to="/types">Type specimens</RouterLink>
         <RouterLink to="/fossils">Fossils</RouterLink>
         <RouterLink to="/literature">Literature</RouterLink>
-        <RouterLink to="/resources/tw/filter/dwc_otus">Specimen data</RouterLink>
+        <RouterLink to="/specimens">Specimens &amp; records</RouterLink>
       </nav>
 
       <nav

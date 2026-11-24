@@ -11,6 +11,7 @@ const PAGES = {
   '/literature': 'The literature on Ceraphronoidea, searchable by author, year and journal.',
   '/keys': 'Identification keys to Ceraphronoidea.',
   '/cite': 'How to cite Ceraphronoidea of the World, its taxon pages, data and images.',
+  '/specimens': 'Museum specimens and literature records of Ceraphronoidea, downloadable as Darwin Core.',
   '/about': 'About the Ceraphronoidea of the World project and team.'
 }
 

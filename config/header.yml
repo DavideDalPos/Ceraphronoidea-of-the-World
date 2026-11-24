@@ -17,8 +17,8 @@ header_links:
         link: /types
       - label: Fossils
         link: /fossils
-      - label: Specimen data (DwC)
-        link: /resources/tw/filter/dwc_otus
+      - label: Specimens & records
+        link: /specimens
 
   - label: Keys
     link: /keys
