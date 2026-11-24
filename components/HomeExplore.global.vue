@@ -56,67 +56,7 @@
       </div>
     </section>
 
-    <!-- Genus index -->
-    <section class="cow-home__sec">
-      <div class="cow-home__row">
-        <div>
-          <p class="cow-home__kicker">Browse</p>
-          <h2 class="cow-home__h2">Genera</h2>
-        </div>
-        <div class="cow-gen__tools">
-          <input
-            v-model="q"
-            type="search"
-            placeholder="Filter genera…"
-            aria-label="Filter genera"
-          />
-          <div
-            class="cow-gen__fams"
-            role="group"
-            aria-label="Family"
-          >
-            <button
-              v-for="f in ['All', ...FAMILIES.map((x) => x.name)]"
-              :key="f"
-              type="button"
-              :class="{ 'is-on': fam === f }"
-              @click="fam = f"
-            >
-              {{ f }}
-            </button>
-          </div>
-        </div>
-      </div>
-      <p
-        v-if="!genera.length"
-        class="cow-home__muted"
-      >
-        Loading genera…
-      </p>
-      <ul
-        v-else
-        class="cow-gen"
-      >
-        <li
-          v-for="g in shownGenera"
-          :key="g.id"
-        >
-          <RouterLink
-            :to="{ name: 'otus-id-overview', params: { id: String(g.otu) } }"
-            :class="['cow-gen__chip', { 'is-big': g.n >= 20 }]"
-          >
-            <i>{{ g.name }}</i>
-            <span v-if="g.n">{{ g.n }}</span>
-          </RouterLink>
-        </li>
-      </ul>
-      <p
-        v-if="genera.length && !shownGenera.length"
-        class="cow-home__muted"
-      >
-        No genus matches “{{ q }}”.
-      </p>
-    </section>
+    <HomeGenera />
 
     <!-- About band -->
     <section class="cow-about-band">
@@ -166,6 +106,7 @@ import { makeAPIRequest } from '@/utils'
 import { resolveAssetUrl } from '@/utils/url'
 import HomeHero from './home/HomeHero.vue'
 import HomeToday from './home/HomeToday.vue'
+import HomeGenera from './home/HomeGenera.vue'
 
 const { base_url } = __APP_ENV__
 const asset = (p) => resolveAssetUrl(p, base_url)
@@ -194,9 +135,6 @@ const TOOLS = [
 ]
 
 const counts = reactive({})
-const genera = ref([])
-const q = ref('')
-const fam = ref('All')
 
 const total = (r) => Number(r.headers['pagination-total']) || 0
 const countNames = (tn, group) =>
@@ -220,55 +158,6 @@ onMounted(async () => {
     }
   })
 
-  try {
-    const base = { 'taxon_name_id[]': SUPERFAMILY, descendants: true, validity: true }
-    const [gRes, sRes] = await Promise.all([
-      makeAPIRequest.get('/taxon_names', { params: { ...base, nomenclature_group: 'Genus', per: 500 } }),
-      makeAPIRequest.get('/taxon_names', { params: { ...base, nomenclature_group: 'Species', per: 2000 } })
-    ])
-    const gens = (gRes.data || []).filter((t) => /::genus$/i.test(t.rank_string || ''))
-    // species per genus, from the first word of each valid species name
-    const per = {}
-    ;(sRes.data || []).forEach((s) => {
-      const g = String(s.cached || '').split(' ')[0]
-      per[g] = (per[g] || 0) + 1
-    })
-    const ids = gens.map((g) => g.id)
-    const otus = new Map()
-    for (let i = 0; i < ids.length; i += 80) {
-      const { data } = await makeAPIRequest.get('/otus', { params: { 'taxon_name_id[]': ids.slice(i, i + 80), per: 500 } })
-      ;(data || []).forEach((o) => !otus.has(o.taxon_name_id) && otus.set(o.taxon_name_id, o.id))
-    }
-    // family of each genus: walk up parent ids through the family list
-    const famOf = await familyOfGenera(gens)
-    genera.value = gens
-      .filter((g) => otus.has(g.id))
-      .map((g) => ({ id: g.id, name: g.cached, otu: otus.get(g.id), n: per[g.cached] || 0, family: famOf[g.id] || '' }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  } catch {
-    genera.value = []
-  }
 })
 
-async function familyOfGenera(gens) {
-  const out = {}
-  await Promise.all(
-    FAMILIES.map(async (f) => {
-      try {
-        const { data } = await makeAPIRequest.get('/taxon_names', {
-          params: { 'taxon_name_id[]': f.tn, descendants: true, nomenclature_group: 'Genus', validity: true, per: 500 }
-        })
-        ;(data || []).forEach((t) => (out[t.id] = f.name))
-      } catch {
-        /* skip */
-      }
-    })
-  )
-  return out
-}
-
-const shownGenera = computed(() => {
-  const term = q.value.trim().toLowerCase()
-  return genera.value.filter((g) => (fam.value === 'All' || g.family === fam.value) && (!term || g.name.toLowerCase().includes(term)))
-})
 </script>

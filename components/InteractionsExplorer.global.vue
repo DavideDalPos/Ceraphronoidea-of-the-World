@@ -14,96 +14,199 @@
     </p>
 
     <template v-else>
-      <!-- Numbers -->
-      <dl class="cow-ix__stats">
-        <div>
-          <dt>Host &amp; prey records</dt>
-          <dd>{{ fmt(attacks.length) }}</dd>
-        </div>
-        <div>
-          <dt>Ceraphronoid species with hosts</dt>
-          <dd>{{ fmt(count(attacks, (r) => r.s.id)) }}</dd>
-        </div>
-        <div>
-          <dt>Host taxa</dt>
-          <dd>{{ fmt(count(attacks, (r) => r.o.id || r.o.label)) }}</dd>
-        </div>
-        <div>
-          <dt>Host families</dt>
-          <dd>{{ fmt(count(attacks, (r) => r.o.family)) }}</dd>
-        </div>
-        <div v-if="plants.length">
-          <dt>Plant records</dt>
-          <dd>{{ fmt(plants.length) }}</dd>
-        </div>
-        <div>
-          <dt>References</dt>
-          <dd>{{ fmt(refCount) }}</dd>
-        </div>
-      </dl>
+      <!-- Explore: numbers, find a taxon, host orders -->
+      <section class="cow-ix__top">
+        <dl class="cow-ix__stats cow-ix__stats--slim">
+          <div>
+            <dt>Host &amp; prey records</dt>
+            <dd>{{ fmt(attacks.length) }}</dd>
+          </div>
+          <div>
+            <dt>Ceraphronoids with hosts</dt>
+            <dd>{{ fmt(count(attacks, (r) => r.s.id)) }}</dd>
+          </div>
+          <div>
+            <dt>Host taxa</dt>
+            <dd>{{ fmt(count(attacks, (r) => r.o.id || r.o.label)) }}</dd>
+          </div>
+          <div>
+            <dt>Host families</dt>
+            <dd>{{ fmt(count(attacks, (r) => r.o.family)) }}</dd>
+          </div>
+          <div>
+            <dt>Hyperparasitoid records</dt>
+            <dd>{{ fmt(attacks.filter((r) => roleOf(r) === 'hyper').length) }}</dd>
+          </div>
+          <div>
+            <dt>References</dt>
+            <dd>{{ fmt(refCount) }}</dd>
+          </div>
+        </dl>
 
-      <!-- Genera: what they attack -->
-      <section class="cow-ix__block">
-        <h2 class="cow-ix__h2">What each genus attacks</h2>
-        <p class="cow-ix__help">
-          Host and prey records per genus, split by host order. Click a bar segment to list those records.
-        </p>
-        <ul
-          class="cow-ix__legend"
-          aria-label="Host orders"
-        >
-          <li
-            v-for="o in legendOrders"
-            :key="o"
-          >
+        <div class="cow-ix__finder">
+          <label
+            class="cow-ix__flabel"
+            for="cow-taxon-find"
+          >Find a taxon</label>
+          <div class="cow-ix__find">
+            <input
+              id="cow-taxon-find"
+              v-model="tq"
+              type="search"
+              autocomplete="off"
+              placeholder="A ceraphronoid, a host, a plant… e.g. Dendrocerus, Aphidius, Aphis"
+              role="combobox"
+              :aria-expanded="matches.length > 0"
+              aria-controls="cow-taxon-list"
+              @keydown.down.prevent="cursor = Math.min(cursor + 1, matches.length - 1)"
+              @keydown.up.prevent="cursor = Math.max(cursor - 1, 0)"
+              @keydown.enter.prevent="matches[cursor] && pickTaxon(matches[cursor])"
+              @keydown.esc="tq = ''"
+            />
+            <ul
+              v-if="matches.length"
+              id="cow-taxon-list"
+              class="cow-ix__suggest"
+              role="listbox"
+            >
+              <li
+                v-for="(m, i) in matches"
+                :key="m.key"
+                role="option"
+                :aria-selected="i === cursor"
+                :class="{ 'is-cur': i === cursor }"
+                @mousedown.prevent="pickTaxon(m)"
+                @mouseenter="cursor = i"
+              >
+                <i>{{ m.label }}</i>
+                <span>{{ m.kind }}</span>
+                <small>{{ m.n }}</small>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="cow-ix__orders">
+          <span class="cow-ix__flabel">Host order</span>
+          <div class="cow-ix__ochips">
             <button
               type="button"
-              :class="{ 'is-on': order === o }"
-              @click="order = order === o ? '' : o"
+              :class="{ 'is-on': !order }"
+              @click="order = ''"
+            >
+              All<small>{{ fmt(attacks.length) }}</small>
+            </button>
+            <button
+              v-for="o in orderStrip"
+              :key="o.order"
+              type="button"
+              :class="{ 'is-on': order === o.order }"
+              @click="order = order === o.order ? '' : o.order"
             >
               <span
                 class="cow-ix__sw"
-                :style="{ background: colorOf(o) }"
-              />{{ o }}
+                :style="{ background: colorOf(o.order) }"
+              />{{ o.order }}<small>{{ o.n }}</small>
             </button>
-          </li>
-        </ul>
-        <div class="cow-ix__bars">
-          <div
-            v-for="g in heatGenera"
-            :key="g.name"
-            :class="['cow-ix__brow', { 'is-dim': genus && genus !== g.name }]"
-          >
-            <button
-              type="button"
-              class="cow-ix__gname"
-              @click="pickCell(g.name, '')"
-            >
-              <i>{{ g.name }}</i>
-              <small>{{ g.family }}</small>
-            </button>
-            <div class="cow-ix__track">
-              <button
-                v-for="seg in segments(g.name)"
-                :key="seg.order"
-                type="button"
-                :class="['cow-ix__seg', { 'is-on': genus === g.name && order === seg.order }]"
-                :style="{ width: `${(seg.n / barMax) * 100}%`, background: colorOf(seg.order) }"
-                :title="`${g.name} on ${seg.order}: ${seg.n} record${seg.n === 1 ? '' : 's'}`"
-                @click="pickCell(g.name, seg.order)"
-              >
-                <span v-if="seg.n / barMax > 0.06">{{ seg.n }}</span>
-              </button>
-            </div>
-            <span class="cow-ix__total">{{ g.n }}</span>
           </div>
         </div>
       </section>
 
       <FoodWeb
+        ref="webEl"
+        v-model:genus="genus"
+        v-model:focus="focus"
         :rows="all"
+        :keep="orderOk"
+        :role-of="roleOf"
         class="cow-ix__block"
+        @records="webSel = $event"
       />
+
+      <!-- Genera: what they attack, and as what -->
+      <div class="cow-ix__duo">
+        <section class="cow-ix__block">
+          <h2 class="cow-ix__h2">What each genus attacks</h2>
+          <p class="cow-ix__help">
+            Records per genus, split by host order (colours as in the host-order row above). Click a segment to list
+            those records.
+          </p>
+          <div class="cow-ix__bars">
+            <div
+              v-for="g in heatGenera"
+              :key="g.name"
+              :class="['cow-ix__brow', { 'is-dim': genus && genus !== g.name }]"
+            >
+              <button
+                type="button"
+                class="cow-ix__gname"
+                @click="pickCell(g.name, '')"
+              >
+                <i>{{ g.name }}</i>
+                <small>{{ g.family }}</small>
+              </button>
+              <div class="cow-ix__track">
+                <button
+                  v-for="seg in segments(g.name)"
+                  :key="seg.order"
+                  type="button"
+                  :class="['cow-ix__seg', { 'is-on': genus === g.name && order === seg.order }]"
+                  :style="{ width: `${(seg.n / barMax) * 100}%`, background: colorOf(seg.order) }"
+                  :title="`${g.name} on ${seg.order}: ${seg.n} record${seg.n === 1 ? '' : 's'}`"
+                  @click="pickCell(g.name, seg.order)"
+                >
+                  <span v-if="seg.n / barMax > 0.06">{{ seg.n }}</span>
+                </button>
+              </div>
+              <span class="cow-ix__total">{{ g.n }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="cow-ix__block">
+          <h2 class="cow-ix__h2">Primary or hyperparasitoid?</h2>
+          <p class="cow-ix__help">
+            Share of each genus' records on non-parasitoid hosts (primary), on other parasitoids (hyper) and as
+            predator. Inferred from the host records.
+          </p>
+          <ul class="cow-ix__rlegend">
+            <li
+              v-for="(r, k) in ROLES"
+              :key="k"
+            >
+              <span
+                class="cow-ix__sw"
+                :style="{ background: r.color }"
+              />{{ r.label }}
+            </li>
+          </ul>
+          <div class="cow-ix__roles">
+            <div
+              v-for="g in roleGenera"
+              :key="g.name"
+              :class="['cow-ix__rrow', { 'is-dim': genus && genus !== g.name }]"
+            >
+              <button
+                type="button"
+                class="cow-ix__gname"
+                @click="genus = genus === g.name ? '' : g.name"
+              >
+                <i>{{ g.name }}</i>
+              </button>
+              <div
+                class="cow-ix__rtrack"
+                :title="g.title"
+              >
+                <span
+                  v-for="s in g.parts"
+                  :key="s.key"
+                  :style="{ width: `${s.pct}%`, background: s.color }"
+                >{{ s.pct >= 14 ? `${Math.round(s.pct)}%` : '' }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <!-- Records -->
       <section
@@ -145,27 +248,32 @@
               {{ f }}
             </option>
           </select>
-          <select
-            v-model="order"
-            aria-label="Host order"
-          >
-            <option value="">All host orders</option>
-            <option
-              v-for="o in allOrders"
-              :key="o"
-              :value="o"
-            >
-              {{ o }}
-            </option>
-          </select>
           <button
-            v-if="genus"
+            v-if="webSel"
             type="button"
             class="cow-ix__pill"
-            @click="genus = ''"
+            @click="clearWeb"
           >
-            <i>{{ genus }}</i> ✕
+            Food web: <i>{{ webSel.label }}</i> ✕
           </button>
+          <template v-else>
+            <button
+              v-if="genus"
+              type="button"
+              class="cow-ix__pill"
+              @click="genus = ''"
+            >
+              <i>{{ genus }}</i> ✕
+            </button>
+            <button
+              v-if="order"
+              type="button"
+              class="cow-ix__pill"
+              @click="order = ''"
+            >
+              {{ order }} ✕
+            </button>
+          </template>
           <button
             v-if="filtersOn"
             type="button"
@@ -190,10 +298,10 @@
           <table class="cow-ix__table">
             <thead>
               <tr>
-                <th>Ceraphronoid</th>
-                <th>Relationship</th>
-                <th>Host</th>
-                <th>Host order: family</th>
+                <th>Taxon</th>
+                <th>Interaction</th>
+                <th>Associated taxon</th>
+                <th>Order: family</th>
                 <th>Reference</th>
               </tr>
             </thead>
@@ -204,13 +312,24 @@
               >
                 <td>
                   <RouterLink
-                    v-if="r.s.id"
+                    v-if="isCeraphronoid(r.s) && r.s.id"
                     :to="{ name: 'otus-id-overview', params: { id: String(r.s.id) } }"
+                    v-html="nameHtml(r.s.label)"
+                  />
+                  <span
+                    v-else
                     v-html="nameHtml(r.s.label)"
                   />
                   <small>{{ r.s.family }}</small>
                 </td>
-                <td>{{ r.rel }}</td>
+                <td>
+                  {{ r.rel }}
+                  <span
+                    v-if="isCeraphronoid(r.s) && ROLES[roleOf(r)]"
+                    class="cow-ix__role"
+                    :style="{ '--c': ROLES[roleOf(r)].color }"
+                  >{{ ROLES[roleOf(r)].short }}</span>
+                </td>
                 <td>
                   <RouterLink
                     v-if="isCeraphronoid(r.o) && r.o.id"
@@ -247,17 +366,17 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import {
   loadAssociations,
   isCeraphronoid,
   nameHtml,
   downloadCsv
 } from '../panels/PanelHosts/associations.js'
+import { ROLES, makeRoleOf } from '../lib/roles.js'
 import FoodWeb from './hosts/FoodWeb.vue'
 
 const route = useRoute()
-const router = useRouter()
 const loading = ref(true)
 const error = ref(false)
 const all = ref([])
@@ -266,11 +385,16 @@ const rel = ref(String(route.query.rel || ''))
 const family = ref(String(route.query.family || ''))
 const order = ref(String(route.query.order || ''))
 const genus = ref(String(route.query.genus || ''))
+const focus = ref(String(route.query.taxon || ''))
+const webSel = ref(null)
+const webEl = ref(null)
 const limit = ref(100)
 const listEl = ref(null)
 
 const fmt = (n) => Number(n || 0).toLocaleString()
 const count = (rows, f) => new Set(rows.map(f).filter(Boolean)).size
+const keyOf = (t) => String(t.id || t.label)
+const fold = (x) => String(x).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 onMounted(async () => {
   try {
@@ -282,34 +406,53 @@ onMounted(async () => {
   }
 })
 
+const roleFn = computed(() => makeRoleOf(all.value))
+const roleOf = (r) => roleFn.value(r)
+
 // records where a ceraphronoid is the subject (parasitoid, predator…)
 const core = computed(() => all.value.filter((r) => isCeraphronoid(r.s)))
 // animal hosts and prey vs plants ("feeds on": adults recorded on plants)
 const attacks = computed(() => core.value.filter((r) => r.rel !== 'feeds on'))
-const plants = computed(() => core.value.filter((r) => r.rel === 'feeds on'))
 const refCount = computed(() => count(core.value.flatMap((r) => (r.cit ? r.cit.split(/;\s*/) : [])), (x) => x))
-const relationships = computed(() => [...new Set(core.value.map((r) => r.rel))].sort())
+const relationships = computed(() => [...new Set(all.value.map((r) => r.rel))].sort())
 const families = computed(() => [...new Set(core.value.map((r) => r.s.family))].filter(Boolean).sort())
-const allOrders = computed(() => [...new Set(core.value.map((r) => r.o.order))].filter(Boolean).sort())
 
-// heat table: genera with records, orders by number of records
-const heat = computed(() => {
-  const m = new Map()
-  attacks.value.forEach((r) => {
-    const g = r.s.genus || '—'
-    const o = r.o.order || 'Order not recorded'
-    const k = `${g}|${o}`
-    m.set(k, (m.get(k) || 0) + 1)
-  })
-  return m
-})
-const cell = (g, o) => heat.value.get(`${g}|${o}`) || 0
-const heatMax = computed(() => Math.max(1, ...heat.value.values()))
+// host orders, biggest first
 const heatOrders = computed(() => {
   const m = new Map()
   attacks.value.forEach((r) => m.set(r.o.order || 'Order not recorded', (m.get(r.o.order || 'Order not recorded') || 0) + 1))
   return [...m].sort((a, b) => b[1] - a[1]).map(([o]) => o)
 })
+// the six biggest get their own colour, the rest share grey
+const PALETTE = ['#6c5240', '#74866a', '#b0562b', '#3f6f8a', '#c49a3a', '#8a5a83']
+const OTHER = 'Other orders'
+const mainOrders = computed(() => heatOrders.value.slice(0, PALETTE.length))
+const colorOf = (o) => {
+  const i = mainOrders.value.indexOf(o)
+  return i >= 0 ? PALETTE[i] : '#a39b90'
+}
+const orderOf = (r) => r.o.order || 'Order not recorded'
+const orderOk = (r) =>
+  !order.value || (order.value === OTHER ? !mainOrders.value.includes(orderOf(r)) : orderOf(r) === order.value)
+const orderStrip = computed(() => {
+  const m = new Map()
+  attacks.value.forEach((r) => {
+    const o = mainOrders.value.includes(orderOf(r)) ? orderOf(r) : OTHER
+    m.set(o, (m.get(o) || 0) + 1)
+  })
+  return [...m].map(([o, n]) => ({ order: o, n })).sort((a, b) => (a.order === OTHER) - (b.order === OTHER) || b.n - a.n)
+})
+
+// bars: genera × host orders
+const heat = computed(() => {
+  const m = new Map()
+  attacks.value.forEach((r) => {
+    const k = `${r.s.genus || '—'}|${orderOf(r)}`
+    m.set(k, (m.get(k) || 0) + 1)
+  })
+  return m
+})
+const cell = (g, o) => heat.value.get(`${g}|${o}`) || 0
 const heatGenera = computed(() => {
   const m = new Map()
   attacks.value.forEach((r) => {
@@ -319,61 +462,118 @@ const heatGenera = computed(() => {
   })
   return [...m.values()].sort((a, b) => b.n - a.n)
 })
-
-// host orders: the six biggest get their own colour, the rest share grey
-const PALETTE = ['#6c5240', '#74866a', '#b0562b', '#3f6f8a', '#c49a3a', '#8a5a83']
-const OTHER = 'Other orders'
-const legendOrders = computed(() => {
-  const main = heatOrders.value.slice(0, PALETTE.length)
-  return heatOrders.value.length > main.length ? [...main, OTHER] : main
-})
-const colorOf = (o) => {
-  const i = heatOrders.value.slice(0, PALETTE.length).indexOf(o)
-  return i >= 0 ? PALETTE[i] : '#a39b90'
-}
 function segments(g) {
-  const main = heatOrders.value.slice(0, PALETTE.length)
-  const out = main.map((o) => ({ order: o, n: cell(g, o) })).filter((x) => x.n)
+  const out = mainOrders.value.map((o) => ({ order: o, n: cell(g, o) })).filter((x) => x.n)
   const rest = heatOrders.value.slice(PALETTE.length).reduce((n, o) => n + cell(g, o), 0)
   if (rest) out.push({ order: OTHER, n: rest })
   return out
 }
 const barMax = computed(() => Math.max(1, ...heatGenera.value.map((g) => g.n)))
 
+// roles per genus
+const roleGenera = computed(() =>
+  heatGenera.value.map((g) => {
+    const rows = attacks.value.filter((r) => (r.s.genus || '—') === g.name && orderOk(r))
+    const c = {}
+    rows.forEach((r) => (c[roleOf(r)] = (c[roleOf(r)] || 0) + 1))
+    const n = rows.length || 1
+    const parts = Object.keys(ROLES).filter((k) => c[k]).map((k) => ({ key: k, color: ROLES[k].color, pct: (c[k] / n) * 100 }))
+    return { name: g.name, parts, title: Object.keys(ROLES).filter((k) => c[k]).map((k) => `${ROLES[k].label}: ${c[k]}`).join(' · ') }
+  }).filter((g) => g.parts.length)
+)
+
 async function pickCell(g, o) {
   const same = genus.value === g && order.value === o
+  focus.value = ''
   genus.value = same ? '' : g
   order.value = same ? '' : o
   await nextTick()
-  listEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  setTimeout(() => listEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
 }
 
+// find a taxon
+const tq = ref('')
+const cursor = ref(0)
+const taxa = computed(() => {
+  const m = new Map()
+  const add = (key, label, kind, extra = {}) => {
+    if (!label) return
+    const e = m.get(key) || { key, label, kind, n: 0, ...extra }
+    e.n++
+    m.set(key, e)
+  }
+  all.value.forEach((r) => {
+    if (isCeraphronoid(r.s)) {
+      if (r.s.genus) add(`g:${r.s.genus}`, r.s.genus, 'Ceraphronoid genus', { genus: r.s.genus, isGenus: true })
+      add(keyOf(r.s), r.s.label, 'Ceraphronoid', { genus: r.s.genus })
+    } else add(keyOf(r.s), r.s.label, r.s.order ? `Host · ${r.s.order}` : 'Host')
+    if (isCeraphronoid(r.o)) add(keyOf(r.o), r.o.label, 'Ceraphronoid', { genus: r.o.genus })
+    else add(keyOf(r.o), r.o.label, r.rel === 'feeds on' ? 'Plant' : r.o.order ? `Host · ${r.o.order}` : 'Host')
+  })
+  return [...m.values()]
+})
+const matches = computed(() => {
+  const words = fold(tq.value).split(/\s+/).filter(Boolean)
+  if (!words.length) return []
+  // the name without author, for ranking
+  const bare = (l) => fold(String(l).split(' ').filter((w, i) => i === 0 || /^[a-z(]/.test(w)).join(' '))
+  const inName = (t) => words.every((w) => bare(t.label).includes(w))
+  return taxa.value
+    .filter((t) => words.every((w) => fold(t.label).includes(w)))
+    .sort((a, b) => inName(b) - inName(a) || bare(b.label).startsWith(words[0]) - bare(a.label).startsWith(words[0]) || b.isGenus - a.isGenus || b.n - a.n)
+    .slice(0, 9)
+})
+watch(tq, () => (cursor.value = 0))
+async function pickTaxon(t) {
+  tq.value = ''
+  if (t.isGenus) {
+    focus.value = ''
+    genus.value = t.genus
+  } else if (t.kind === 'Ceraphronoid' && t.genus) {
+    genus.value = t.genus
+    focus.value = t.key
+  } else {
+    genus.value = ''
+    focus.value = t.key
+  }
+  await nextTick()
+  setTimeout(() => webEl.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
+}
+function clearWeb() {
+  focus.value = ''
+  webEl.value?.clear()
+}
+
+// records table
 const shown = computed(() => {
-  const term = q.value.trim().toLowerCase()
-  return core.value
+  const words = fold(q.value).split(/\s+/).filter(Boolean)
+  const base = webSel.value
+    ? all.value.filter((r) => webSel.value.ids.has(r.id))
+    : core.value.filter((r) => orderOk(r) && (!genus.value || r.s.genus === genus.value))
+  return base
     .filter(
       (r) =>
         (!rel.value || r.rel === rel.value) &&
-        (!family.value || r.s.family === family.value) &&
-        (!order.value ||
-          (order.value === OTHER ? !heatOrders.value.slice(0, PALETTE.length).includes(r.o.order || 'Order not recorded') : r.o.order === order.value)) &&
-        (!genus.value || r.s.genus === genus.value) &&
-        (!term || `${r.s.label} ${r.o.label} ${r.o.family} ${r.o.order} ${r.cit}`.toLowerCase().includes(term))
+        (!family.value || r.s.family === family.value || !isCeraphronoid(r.s)) &&
+        (!words.length || words.every((w) => fold(`${r.s.label} ${r.o.label} ${r.o.family} ${r.o.order} ${r.cit}`).includes(w)))
     )
-    .sort((a, b) => a.s.label.localeCompare(b.s.label) || a.o.label.localeCompare(b.o.label))
+    .sort((a, b) => isCeraphronoid(b.s) - isCeraphronoid(a.s) || a.s.label.localeCompare(b.s.label) || a.o.label.localeCompare(b.o.label))
 })
 
-const filtersOn = computed(() => Boolean(q.value || rel.value || family.value || order.value || genus.value))
+const filtersOn = computed(() => Boolean(q.value || rel.value || family.value || order.value || genus.value || focus.value || webSel.value))
 function reset() {
-  q.value = rel.value = family.value = order.value = genus.value = ''
+  q.value = rel.value = family.value = order.value = genus.value = focus.value = ''
+  webEl.value?.clear()
 }
 
-// keep filters in the URL so a view can be shared
-watch([q, rel, family, order, genus], () => {
+// keep the view in the URL so it can be shared
+watch([q, rel, family, order, genus, focus], () => {
   limit.value = 100
   const query = Object.fromEntries(
-    Object.entries({ q: q.value, rel: rel.value, family: family.value, order: order.value, genus: genus.value }).filter(([, v]) => v)
+    Object.entries({ genus: genus.value, taxon: focus.value, order: order.value, q: q.value, rel: rel.value, family: family.value }).filter(([, v]) => v)
   )
-  router.replace({ query })
+  // replaceState, not router.replace: the router scrolls to the top on every navigation
+  const qs = new URLSearchParams(query).toString()
+  window.history.replaceState(window.history.state, '', `${location.pathname}${location.search}#${route.path}${qs ? `?${qs}` : ''}`)
 })
 </script>
