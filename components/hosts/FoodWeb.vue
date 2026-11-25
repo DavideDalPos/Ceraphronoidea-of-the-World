@@ -26,7 +26,10 @@
       </div>
     </header>
 
-    <div class="cow-fw__genera">
+    <div
+      v-if="chips"
+      class="cow-fw__genera"
+    >
       <div class="cow-fw__fam">
         <span class="cow-fw__famname">Overview</span>
         <div class="cow-fw__chips">
@@ -240,7 +243,40 @@
         {{ pinnedLink.refs.length || 'no' }} reference{{ pinnedLink.refs.length === 1 ? '' : 's' }} · listed in the
         records below
       </p>
-      <ul v-if="pinnedLink.refs.length">
+      <p
+        v-if="refsLoading"
+        class="cow-fw__loading"
+      >
+        Loading references…
+      </p>
+      <ol
+        v-else-if="fullRefs.length"
+        class="cow-fw__refs"
+      >
+        <li
+          v-for="r in fullRefs"
+          :key="r.id"
+        >
+          <span v-html="r.html" />
+          <span
+            v-if="r.pages"
+            class="cow-fw__pp"
+          > Cited on p. {{ r.pages }}.</span>
+          <span class="cow-fw__reflinks">
+            <a
+              v-if="r.doi"
+              :href="`https://doi.org/${r.doi}`"
+              target="_blank"
+              rel="noopener"
+            >doi:{{ r.doi }}</a>
+            <router-link :to="{ path: '/literature', query: { q: refQuery(r.short) } }">In Literature</router-link>
+          </span>
+        </li>
+      </ol>
+      <ul
+        v-else-if="pinnedLink.refs.length"
+        class="cow-fw__short"
+      >
         <li
           v-for="r in pinnedLink.refs"
           :key="r"
@@ -303,6 +339,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { makeAPIRequest } from '@/utils/request'
 import { isCeraphronoid } from '../../panels/PanelHosts/associations.js'
 import { ROLES } from '../../lib/roles.js'
 import { csv, download } from '../../lib/dwc.js'
@@ -312,7 +349,8 @@ const props = defineProps({
   genus: { type: String, default: '' },
   focus: { type: String, default: '' },
   keep: { type: Function, default: () => true },
-  roleOf: { type: Function, default: () => 'primary' }
+  roleOf: { type: Function, default: () => 'primary' },
+  chips: { type: Boolean, default: true }
 })
 const emit = defineEmits(['update:genus', 'update:focus', 'records'])
 
@@ -571,6 +609,45 @@ const pinnedLink = computed(() => {
   const e = graph.value.edges.find(([, , m]) => m.id === pinned.value)
   return e ? info(...e) : null
 })
+
+// full references of the clicked line, from its records' citations
+const fullRefs = ref([])
+const refsLoading = ref(false)
+const cache = new Map()
+const cleanRef = (s) =>
+  String(s || '')
+    .replace(/\\textit\s*/g, '')
+    .replace(/\s*\[in [^\]]*\]/g, '')
+    .replace(/\s*https?:\/\/(dx\.)?doi\.org\/\S+\s*$/, '')
+    .trim()
+watch(
+  () => pinnedLink.value?.id,
+  async (id) => {
+    fullRefs.value = []
+    if (!id) return
+    if (cache.has(id)) return (fullRefs.value = cache.get(id))
+    refsLoading.value = true
+    try {
+      const { data } = await makeAPIRequest.get('/citations', {
+        params: { citation_object_type: 'BiologicalAssociation', citation_object_id: pinnedLink.value.ids.slice(0, 200), extend: ['source'], per: 500 }
+      })
+      const m = new Map()
+      ;(Array.isArray(data) ? data : []).forEach((c) => {
+        const src = c.source || {}
+        const e = m.get(c.source_id) || { id: c.source_id, html: cleanRef(src.label || c.citation_source_body), short: src.author_year || c.citation_source_body || '', doi: String(src.doi || '').replace(/^https?:\/\/(dx\.)?doi\.org\//, ''), year: Number(src.year) || 0, pages: new Set() }
+        if (c.pages) e.pages.add(c.pages)
+        m.set(c.source_id, e)
+      })
+      const list = [...m.values()].map((e) => ({ ...e, pages: [...e.pages].join(', ') })).sort((a, b) => a.year - b.year || a.short.localeCompare(b.short))
+      cache.set(id, list)
+      if (pinnedLink.value?.id === id) fullRefs.value = list
+    } catch {
+      fullRefs.value = []
+    } finally {
+      refsLoading.value = false
+    }
+  }
+)
 
 // the focused taxon
 const focusNodes = computed(() => graph.value.layers.flat().filter((n) => n.id === props.focus))

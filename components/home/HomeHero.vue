@@ -62,17 +62,62 @@
     </div>
 
     <!-- numbers band -->
-    <div class="cow-hh__band">
+    <div
+      ref="bandEl"
+      :class="['cow-hh__band', { 'is-run': stats.some((x) => x.go) }]"
+    >
       <dl class="cow-hh__stats">
-        <div
-          v-for="s in stats"
+        <component
+          :is="s.to ? 'RouterLink' : 'div'"
+          v-for="(s, i) in stats"
           :key="s.label"
-          class="cow-hh__stat"
+          :to="s.to"
+          :class="['cow-hh__stat', { 'is-go': s.go, 'is-link': s.to }]"
+          :style="{ '--i': i }"
         >
-          <dd>{{ s.value === null ? '…' : fmt(s.shown) }}</dd>
+          <svg
+            class="cow-hh__icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          ><path :d="ICONS[i]" /></svg>
+          <dd :aria-label="s.value === null ? 'loading' : fmt(s.value)">
+            <span
+              v-if="s.value === null"
+              class="cow-hh__wait"
+            >…</span>
+            <span
+              v-else
+              class="cow-odo"
+              aria-hidden="true"
+            >
+              <template
+                v-for="(ch, k) in fmt(s.value).split('')"
+                :key="k"
+              >
+                <span
+                  v-if="/\d/.test(ch)"
+                  class="cow-odo__col"
+                >
+                  <span
+                    class="cow-odo__strip"
+                    :style="{ transform: s.go ? `translateY(-${(10 + Number(ch)) * 10 / 2}%)` : 'translateY(0)', transitionDelay: `${s.delay + k * 60}ms` }"
+                  >
+                    <span
+                      v-for="n in 20"
+                      :key="n"
+                    >{{ (n - 1) % 10 }}</span>
+                  </span>
+                </span>
+                <span
+                  v-else
+                  class="cow-odo__sep"
+                >{{ ch }}</span>
+              </template>
+            </span>
+          </dd>
           <dt>{{ s.label }}</dt>
           <span class="cow-hh__note">{{ s.note }}</span>
-        </div>
+        </component>
       </dl>
     </div>
 
@@ -127,7 +172,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { makeAPIRequest } from '@/utils/request'
 import { resolveAssetUrl } from '@/utils/url'
 import AutocompleteOtu from '../AutocompleteOtu.global.vue'
@@ -164,13 +209,64 @@ function show(i) {
 }
 
 const stats = reactive([
-  { label: 'Valid species', note: 'in 3 families', value: null, shown: 0 },
-  { label: 'Valid genera', note: 'living and fossil', value: null, shown: 0 },
-  { label: 'Host records', note: 'who attacks whom', value: null, shown: 0 },
-  { label: 'Images', note: 'slides and habitus', value: null, shown: 0 },
-  { label: 'References', note: 'since 1807', value: null, shown: 0 },
-  { label: 'Specimens', note: 'in Darwin Core', value: null, shown: 0 }
+  { label: 'Valid species', note: 'in 3 families', value: null, shown: 0, go: false, delay: 0, to: null },
+  { label: 'Valid genera', note: 'living and fossil', value: null, shown: 0, go: false, delay: 0, to: null },
+  { label: 'Host records', note: 'who attacks whom', value: null, shown: 0, go: false, delay: 0, to: '/interactions' },
+  { label: 'Images', note: 'slides and habitus', value: null, shown: 0, go: false, delay: 0, to: '/types' },
+  { label: 'References', note: 'since 1807', value: null, shown: 0, go: false, delay: 0, to: '/literature' },
+  { label: 'Specimens', note: 'in Darwin Core', value: null, shown: 0, go: false, delay: 0, to: '/specimens' }
 ])
+// small line icons, drawn when the band comes into view
+const ICONS = [
+  'M12 3.2a1.5 1.5 0 1 0 .01 0M12 6.6c-1.3 0-2.1 1-2.1 2.2s.8 2.2 2.1 2.2 2.1-1 2.1-2.2-.8-2.2-2.1-2.2zM12 11.6c-1.7 0-2.6 1.5-2.6 3.5s.9 4.2 2.6 4.2 2.6-2.2 2.6-4.2-.9-3.5-2.6-3.5zM10 8.2 3.5 5.6M14 8.2l6.5-2.6M10.1 9.8 4.8 11.4M13.9 9.8l5.3 1.6',
+  'M12 21V9M12 13 6.5 8.5M12 13l5.5-4.5M6.5 8.5V4.5M17.5 8.5V4.5M12 9V3.5',
+  'M6 12m-2.2 0a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0-4.4 0M18 5.5m-2.2 0a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0-4.4 0M18 18.5m-2.2 0a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0-4.4 0M8 11l8-4.4M8 13l8 4.4',
+  'M3.5 8h3.5l2-2.5h6l2 2.5h3.5v11.5h-17zM12 16.8m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0',
+  'M4.5 5h6a2 2 0 0 1 1.5.7V20a2.3 2.3 0 0 0-1.5-.6h-6zM19.5 5h-6a2 2 0 0 0-1.5.7V20a2.3 2.3 0 0 1 1.5-.6h6z',
+  'M12 2.5v13M8.5 15.5h7v5.5h-7zM9.5 6.5h5M10 18.2h4'
+]
+// run the animation when the band is on screen
+const bandEl = ref(null)
+const inView = ref(false)
+let io = null
+onMounted(() => {
+  if (!('IntersectionObserver' in window)) return (inView.value = true)
+  io = new IntersectionObserver(
+    (es) => es.forEach((e) => e.isIntersecting && ((inView.value = true), io.disconnect())),
+    { threshold: 0.35 }
+  )
+  if (bandEl.value) io.observe(bandEl.value)
+})
+onBeforeUnmount(() => io?.disconnect())
+// all numbers roll together once every value has arrived (or after 2.5 s,
+// then any late one rolls as soon as it comes) and the band is visible
+let waited = false
+let waitTimer = null
+function startRolls() {
+  stats.forEach((s, i) => {
+    if (s.value === null || s.go) return
+    s.delay = waited ? 0 : i * 140
+    setTimeout(() => (s.go = true), 40)
+  })
+}
+watch(
+  () => [inView.value, ...stats.map((s) => s.value)],
+  () => {
+    if (!inView.value) return
+    const all = stats.every((s) => s.value !== null)
+    if (all || waited) {
+      clearTimeout(waitTimer)
+      startRolls()
+      waited = true
+    } else if (!waitTimer) {
+      waitTimer = setTimeout(() => {
+        waited = true
+        startRolls()
+      }, 2500)
+    }
+  },
+  { immediate: true }
+)
 const fmt = (n) => Number(n).toLocaleString()
 
 // count up once, quickly

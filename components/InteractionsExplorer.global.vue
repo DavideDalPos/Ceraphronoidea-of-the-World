@@ -424,7 +424,7 @@ const heatOrders = computed(() => {
   return [...m].sort((a, b) => b[1] - a[1]).map(([o]) => o)
 })
 // the six biggest get their own colour, the rest share grey
-const PALETTE = ['#6c5240', '#74866a', '#b0562b', '#3f6f8a', '#c49a3a', '#8a5a83']
+const PALETTE = ['#6c5240', '#74866a', '#b0562b', '#3f6f8a', '#c49a3a', '#9a6b74']
 const OTHER = 'Other orders'
 const mainOrders = computed(() => heatOrders.value.slice(0, PALETTE.length))
 const colorOf = (o) => {

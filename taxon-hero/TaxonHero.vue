@@ -201,8 +201,10 @@ const speciesCount = ref(0)
 const hostCount = ref(0)
 let controller = null
 
+
 const plainName = computed(() => String(props.taxon?.full_name_tag || '').replace(/<[^>]+>/g, ''))
 const fmt = (n) => Number(n).toLocaleString()
+
 const open = (i) => (viewer.value = i)
 const go = (d) => (viewer.value = (viewer.value + d + images.value.length) % images.value.length)
 

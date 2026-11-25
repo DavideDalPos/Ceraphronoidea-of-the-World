@@ -12,7 +12,7 @@ layout: fullwidth
 >
 <div class="cow-intro">
 <h1 class="cow-title">Specimens &amp; records</h1>
-<p class="cow-lead">Museum specimens and literature records of Ceraphronoidea, with their repositories, types, collectors and localities. Filter, then download as Darwin Core.</p>
+<p class="cow-lead">Specimen records (specimens examined, held in collections worldwide) and literature records of Ceraphronoidea, with photos, types, collectors and places. Filter, then download as Darwin Core.</p>
 </div>
 </plate-strip>
 

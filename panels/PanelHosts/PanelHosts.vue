@@ -40,6 +40,18 @@
         </div>
       </dl>
 
+      <!-- food web of this taxon -->
+      <FoodWeb
+        v-if="allRows.length && webAnimal"
+        v-model:genus="webGenus"
+        v-model:focus="webFocus"
+        :rows="allRows"
+        :keep="webKeep"
+        :role-of="roleOf"
+        :chips="false"
+        class="cow-hx__web"
+      />
+
       <!-- what kind of record -->
       <div
         class="cow-hx__tabs"
@@ -159,8 +171,10 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { nameHtml, isCeraphronoid, downloadCsv } from './associations.js'
+import { nameHtml, isCeraphronoid, downloadCsv, loadAssociations } from './associations.js'
 import { useTaxonHosts } from './useTaxonHosts.js'
+import FoodWeb from '../../components/hosts/FoodWeb.vue'
+import { makeRoleOf } from '../../lib/roles.js'
 
 const props = defineProps({
   otuId: { type: [Number, String], default: null },
@@ -168,6 +182,39 @@ const props = defineProps({
 })
 
 const { loading, rows, asObject, animal, plants, refs, hostCount, familyCount, speciesCount, orders } = useTaxonHosts(props)
+// food web: the species itself (focused, inside its genus), a genus, or a family
+const allRows = ref([])
+loadAssociations()
+  .then((r) => (allRows.value = r))
+  .catch(() => {})
+const roleFn = computed(() => makeRoleOf(allRows.value))
+const roleOf = (r) => roleFn.value(r)
+const rankOf = computed(() => String(props.taxon?.rank || props.taxon?.rank_string || '').toLowerCase().split('::').pop())
+const webAnimal = computed(() => animal.value.length > 0)
+const webGenus = ref('')
+const webFocus = ref('')
+const webFamily = ref('')
+watch(
+  () => [props.otuId, rankOf.value, animal.value.length],
+  () => {
+    const r = rankOf.value
+    const first = animal.value[0]?.s || {}
+    webFamily.value = ''
+    if (/species/.test(r)) {
+      webGenus.value = first.genus || ''
+      webFocus.value = String(props.otuId)
+    } else if (/genus/.test(r)) {
+      webGenus.value = props.taxon?.name || first.genus || ''
+      webFocus.value = ''
+    } else {
+      webGenus.value = ''
+      webFocus.value = ''
+      if (/family/.test(r) && !/super/.test(r)) webFamily.value = props.taxon?.name || ''
+    }
+  },
+  { immediate: true }
+)
+const webKeep = (r) => !webFamily.value || r.s.family === webFamily.value
 const CARD_LIMIT = 12
 const openCards = reactive({})
 const kind = ref('hosts')

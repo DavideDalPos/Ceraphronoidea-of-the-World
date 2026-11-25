@@ -8,8 +8,13 @@ taxa_page:
       - - - 'panel:names'
           - 'panel:content'
           - 'panel:keys'
+          - 'panel:similar'
 
         - - 'panel:map'
+          - 'panel:external'
+          - 'panel:knowledge'
+          - 'panel:identify'
+          - 'panel:fossil'
           - 'panel:children'
           - 'panel:hosts-summary'
           - 'panel:type-specimen'
@@ -22,6 +27,16 @@ taxa_page:
     panels:
       - - - 'panel:hosts'
       - - - 'panel:biological-association-graphs'
+
+  specimens:
+    label: Specimens
+    panels:
+      - - - 'panel:specimens'
+
+  literature:
+    label: Literature
+    panels:
+      - - - 'panel:literature'
 
   images:
     label: Images
