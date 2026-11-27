@@ -30,7 +30,12 @@
       v-if="synonyms.length"
       class="cow-ch__syn"
     >
-      <p class="cow-ch__kicker">Synonyms of this {{ rankWord }}</p>
+      <p
+        v-if="childLabel !== 'Synonyms'"
+        class="cow-ch__kicker"
+      >
+        Synonyms of this {{ rankWord }}
+      </p>
       <ul>
         <li
           v-for="s in synonyms"
@@ -141,7 +146,8 @@ const rankWord = computed(() => String(props.taxon?.rank || 'taxon').toLowerCase
 const childLabel = computed(() => {
   const r = rankWord.value
   if (/^(genus|subgenus)$/.test(r)) return 'Species'
-  if (/species/.test(r)) return 'Subspecies'
+  // a species page usually lists only its synonyms
+  if (/species/.test(r)) return children.value.length ? 'Subspecies' : 'Synonyms'
   if (/family|tribe/.test(r)) return 'Genera'
   return 'Included taxa'
 })
